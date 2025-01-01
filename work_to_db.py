@@ -19,6 +19,10 @@ appeals.create_table()
 def add_user(user_id, name, address):
     users.add_value(["user_id", "name", "address"], (user_id, name, address))
 
+# Если ответ нужно доставить по электронной почте
+def add_email(user_id, email):
+    users.update_value(["email", "user_id"], (email, user_id))
+
 
 # Добавление обращения в таблицу appeal
 def add_appeal(user_id, text, media_id=None):

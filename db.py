@@ -2,38 +2,64 @@ import sqlite3
 
 
 class Table():
-    'Класс для создания таблиц и внесения записей'
+    'Класс для работы с таблицой в базе данных'
 
-    def __init__(self, name, db):
+    def __init__(self, name, db, columns=None):
         self.name = name
         self.db = db
-        self._columns = []
+        self.columns = columns
 
-    def create_table(self, key, columns):
-        self._columns = columns.keys()
-        col = ', '.join(k + ' ' + v for k, v in columns.items())
+    # Метод для создания таблицы
+    def create_table(self):
+        col = ', '.join(k + ' ' + v for k, v in self.columns.items())
 
+        # Создаём таблицу если отсутствует
         connection = sqlite3.connect(self.db)
         cursor = connection.cursor()
         cursor.execute(f"CREATE TABLE IF NOT EXISTS {self.name} ({col})")
         connection.commit()
         connection.close()
 
-    def add_value(self, values):
+    # Добавляем запись в таблицу
+    def add_value(self, col: list[str], values: tuple[None, ...]):
         connection = sqlite3.connect(self.db)
         cursor = connection.cursor()
 
-        def generate_addition_request(col):
-            col = ', '.join(col)
-            empty_value = ', '.join(['?' for _ in col])
-            return f"INSERT INTO Users ({col}) VALUES ({empty_value})"
+        # Функция формирования запроса для добавления записи
+        def generate_addition_request(name, columns):
+            col = ', '.join(columns)
+            empty_value = ', '.join(['?' for _ in columns])
+            return f"INSERT INTO {name} ({col}) VALUES ({empty_value})"
 
-        request = generate_addition_request(self._columns)
-        cursor.execute(request, (values))
+        # Добавление записи в таблицу
+        request = generate_addition_request(self.name, col)
+        try:
+            cursor.execute(request, values)
+            connection.commit()
+            connection.close()
+        except sqlite3.IntegrityError:
+            print('Запись о пользователе уже есть в таблице.')
+
+        # Обновляем атрибуты
+        for i in col:
+            self.columns[i] = ''
+
+    # Обновляем запись в таблице
+    def update_value(self, col: list[str], values: tuple[None, ...]):
+        connection = sqlite3.connect(self.db)
+        cursor = connection.cursor()
+
+        # Функция формирования запроса для добавления записи
+        def generate_addition_request(name, columns):
+            col = '= ?'.join(columns[:-1]) + ' = ?'
+            return f"UPDATE {name} SET {col} WHERE {columns[-1] + ' = ?'}"
+
+        # Добавление записи в таблицу
+        request = generate_addition_request(self.name, col)
+        cursor.execute(request, values)
         connection.commit()
         connection.close()
 
-
-users = Table("users", "activectizen.db")
-col = {"user_id": "INTEGER PRIMARY KEY", "name": "TEXT NOT NULL", "address": "TEXT NOT NULL", "email": "TEXT"}
-users.create_table("user_id", col)
+        # Обновляем атрибуты
+        for i in col:
+            self.columns[i] = ''

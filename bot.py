@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, types, F, utils
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from work_to_db import *
 
@@ -16,8 +16,8 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     buttons = [[types.KeyboardButton(text="Жалоба"),
-         types.KeyboardButton(text="Благодарность"),
-         types.KeyboardButton(text="Предложение")]]
+                types.KeyboardButton(text="Благодарность"),
+                types.KeyboardButton(text="Предложение")]]
     markup = types.ReplyKeyboardMarkup(keyboard=buttons)
     text = 'Здравствуйте. Это бот "Активный гражданин" где вы можете оставить жалобу, благодарность или предложение.'
     text1 = 'Что хотите оставить?'
@@ -33,23 +33,28 @@ stat = {}
 @dp.message(F.text == "Благодарность")
 @dp.message(F.text == "Предложение")
 async def choose_treatment(message: types.Message):
-    await message.answer("Напишите ваше ФИО")
+    await message.answer("Напишите ваше ФИО", reply_markup=types.ReplyKeyboardRemove())
     # Присвоение статуса для отделения ФИО от текста обращения
     stat[message.chat.id] = 'name'
     number = add_appeal(message.text, message.chat.id)
-    stat[message.chat.id] = ('name', number)
+    stat[message.chat.id] = ['name', number]
+
 
 # Хэндлер на любые текстовые сообщения
 @dp.message(F.text)
 async def getting_text(message: types.Message):
     user_id = message.chat.id
     if stat[user_id][0] == 'name':
+        add_user(user_id, message.text.capitalize())
+        stat[message.chat.id][0] = 'phone_number'
+        await message.answer("Напишите ваш номер телефона")
+
+    elif stat[user_id][0] == "phone_number":
+        add_phone_number(user_id, message.text)
         button = [[types.KeyboardButton(text="Отправить геолокацию", request_location=True)]]
         markup = types.ReplyKeyboardMarkup(keyboard=button)
 
         await message.answer("Напишите свой адрес, для получения на него ответа.", reply_markup=markup)
-
-        add_user(user_id, message.text.capitalize())
 
 # Запуск процесса поллинга новых апдейтов
 async def main():

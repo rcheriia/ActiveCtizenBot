@@ -38,12 +38,18 @@ class Table():
             cursor.execute(request, values)
             connection.commit()
             connection.close()
+            ret = 1
         except sqlite3.IntegrityError:
             print('Запись уже есть в таблице.')
+            ret = 0
+        except sqlite3.OperationalError:
+            print('Что-то не то')
 
         # Обновляем атрибуты
         for i in col:
             self.columns[i] = ''
+
+        return ret
 
     # Обновляем запись в таблице
     def update_value(self, col: list[str], values: tuple[Any, ...]):
@@ -54,7 +60,7 @@ class Table():
 
         # Добавление записи в таблицу
         request = generate_addition_request(self.name, col)
-        connection = sqlite3.connect(self.db,timeout=10.0)
+        connection = sqlite3.connect(self.db, timeout=10.0)
         cursor = connection.cursor()
 
         cursor.execute(request, values)

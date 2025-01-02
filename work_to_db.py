@@ -4,7 +4,7 @@ from db import Table
 number_hits = {}
 
 # Создание таблицы пользователей
-col = {"user_id": "INTEGER PRIMARY KEY", "name": "TEXT", "address": "TEXT", "email": "TEXT"}
+col = {"user_id": "INTEGER PRIMARY KEY", "name": "TEXT", "phone_number": "TEXT", "address": "TEXT", "email": "TEXT"}
 users = Table("users", "ActiveBot.db", columns=col)
 users.create_table()
 
@@ -19,7 +19,8 @@ appeals.create_table()
 def add_user(user_id: int, name: str):
     users.add_value(["user_id", "name"], (user_id, name))
 
-
+def add_phone_number(user_id: int, phone_number: str):
+    users.add_value(["user_id", "phone_number"], (user_id, phone_number))
 # Добавляем адрес уже к существующему пользователю
 def add_address(user_id: int, address: str):
     users.update_value(["users_id", "address"], (user_id, address))
@@ -35,13 +36,13 @@ def add_appeal(category: str, user_id: int):
     # Формирование номера обращения
     data = str(date.today()).replace('-', '')
     count = number_hits.setdefault(data, 1)
-    number_hits[data] += 1
     n = str(count) if count > 9 else '0' + str(count)
     ap_id = int(data[2:] + n)
 
-    appeals.add_value(["appeal_id", "user_id", "category"], (ap_id, user_id, category))
+    number_hits[data] += appeals.add_value(["appeal_id", "user_id", "category"], (ap_id, user_id, category))
 
     return ap_id
+
 
 # Добавление текста и фотографии, если есть
 def add_content_appeal(number: int, text: str, media_id=None):

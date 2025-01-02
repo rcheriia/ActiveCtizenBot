@@ -1,8 +1,9 @@
 import sqlite3
+from typing import Any
 
 
 class Table():
-    'Класс для работы с таблицой в базе данных'
+    'Класс для работы с таблицей в базе данных'
 
     def __init__(self, name, db, columns=None):
         self.name = name
@@ -14,48 +15,48 @@ class Table():
         col = ', '.join(k + ' ' + v for k, v in self.columns.items())
 
         # Создаём таблицу если отсутствует
-        connection = sqlite3.connect(self.db)
+        connection = sqlite3.connect(self.db, timeout=10.0)
         cursor = connection.cursor()
         cursor.execute(f"CREATE TABLE IF NOT EXISTS {self.name} ({col})")
         connection.commit()
         connection.close()
 
     # Добавляем запись в таблицу
-    def add_value(self, col: list[str], values: tuple[None, ...]):
-        connection = sqlite3.connect(self.db)
-        cursor = connection.cursor()
-
+    def add_value(self, col: list[str], values: tuple[Any, ...]):
         # Функция формирования запроса для добавления записи
         def generate_addition_request(name, columns):
-            col = ', '.join(columns)
+            count = ', '.join(columns)
             empty_value = ', '.join(['?' for _ in columns])
-            return f"INSERT INTO {name} ({col}) VALUES ({empty_value})"
+            return f"INSERT INTO {name} ({count}) VALUES ({empty_value})"
 
         # Добавление записи в таблицу
         request = generate_addition_request(self.name, col)
+        connection = sqlite3.connect(self.db, timeout=10.0)
+        cursor = connection.cursor()
+
         try:
             cursor.execute(request, values)
             connection.commit()
             connection.close()
         except sqlite3.IntegrityError:
-            print('Запись о пользователе уже есть в таблице.')
+            print('Запись уже есть в таблице.')
 
         # Обновляем атрибуты
         for i in col:
             self.columns[i] = ''
 
     # Обновляем запись в таблице
-    def update_value(self, col: list[str], values: tuple[None, ...]):
-        connection = sqlite3.connect(self.db)
-        cursor = connection.cursor()
-
+    def update_value(self, col: list[str], values: tuple[Any, ...]):
         # Функция формирования запроса для добавления записи
         def generate_addition_request(name, columns):
-            col = '= ?'.join(columns[:-1]) + ' = ?'
-            return f"UPDATE {name} SET {col} WHERE {columns[-1] + ' = ?'}"
+            count = ' = ?, '.join(columns[:-1]) + ' = ?'
+            return f"UPDATE {name} SET {count} WHERE {columns[-1] + ' = ?'}"
 
         # Добавление записи в таблицу
         request = generate_addition_request(self.name, col)
+        connection = sqlite3.connect(self.db,timeout=10.0)
+        cursor = connection.cursor()
+
         cursor.execute(request, values)
         connection.commit()
         connection.close()

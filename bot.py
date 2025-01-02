@@ -3,11 +3,12 @@ import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from work_to_db import *
+from config import token
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.INFO)
 # Объект бота
-bot = Bot(token="7502571533:AAHNldxkyTdsbWK9USgo6txboCgA-QPvzLU")
+bot = Bot(token=token)
 # Диспетчер
 dp = Dispatcher()
 

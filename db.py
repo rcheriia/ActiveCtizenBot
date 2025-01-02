@@ -33,6 +33,7 @@ class Table():
         request = generate_addition_request(self.name, col)
         connection = sqlite3.connect(self.db, timeout=10.0)
         cursor = connection.cursor()
+        ret = 0
 
         try:
             cursor.execute(request, values)
@@ -41,7 +42,6 @@ class Table():
             ret = 1
         except sqlite3.IntegrityError:
             print('Запись уже есть в таблице.')
-            ret = 0
         except sqlite3.OperationalError:
             print('Что-то не то')
 

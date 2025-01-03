@@ -49,7 +49,7 @@ class Table():
                 ret = 1
 
             except sqlite3.OperationalError:
-                print('База данных опять тебя броканула')
+                self.add_value(col, values)
 
         else:
             print('Запись уже есть в таблице.')

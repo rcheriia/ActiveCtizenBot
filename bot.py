@@ -5,7 +5,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.filters.command import Command
 from work_to_db import *
 from config import token
-from location import get_addr, sl, menu, all, reply
+from location import get_addr, sl, menu, al, reply
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.INFO)
@@ -38,13 +38,12 @@ stat = {}
 async def choose_treatment(message: types.Message):
     await message.answer("Напишите ваше ФИО", reply_markup=types.ReplyKeyboardRemove())
     # Присвоение статуса для отделения ФИО от текста обращения
-    stat[message.chat.id] = 'name'
     number = add_appeal(message.text, message.chat.id)
-    stat[message.chat.id] = ['name', number, message.text]
+    stat[message.chat.id] = ['name', number, message.text, '']
 
 
 # Хэндлер на любые текстовые сообщения
-@dp.message(F.text, F.func(lambda msg: msg.text not in all))
+@dp.message(F.text, F.func(lambda msg: msg.text not in al))
 async def getting_text(message: types.Message):
     user_id = message.chat.id
     if stat[user_id][0] == 'name':
@@ -131,6 +130,8 @@ async def getting_main_menu(callback: types.CallbackQuery):
 # Выбор подраздела обращения
 @dp.message(F.text, F.func(lambda msg: msg.text in menu))
 async def selecting_subsection(message: types.Message):
+    stat[message.chat.id][3] = message.text
+
     markup = ReplyKeyboardBuilder()
     for i in [*sl[message.text], "Другое", "Назад"]:
         markup.add(types.KeyboardButton(text=i))
@@ -155,17 +156,17 @@ async def return_main_menu(message: types.Message):
 
 
 # Выбор раздела обращения
-@dp.message(F.text, F.func(lambda msg: msg.text in all))
+@dp.message(F.text, F.func(lambda msg: msg.text in al))
 async def selecting_subsection(message: types.Message):
     stat[message.chat.id][0] = "text_appeal"
-    add_chapter(stat[message.chat.id][1], message.text)
+    add_chapter(stat[message.chat.id][1], f"{stat[message.chat.id][3]} | {message.text}")
     await message.answer("Напишите текст обращения. Если необходимо, прикрепите фото.",
                          reply_markup=types.ReplyKeyboardRemove())
 
 
 # При отправке обращения с фото
-@dp.message(content_types=['photo'])
-async def check_robot(message: types.Message):
+@dp.message(F.photo)
+async def add_content_app(message: types.Message):
     # Добавляем текст и фото в базу данных
     user_id = message.chat.id
     stat[user_id][0] = "email"
@@ -176,6 +177,12 @@ async def check_robot(message: types.Message):
                 types.InlineKeyboardButton(text="По адресу заявителя", callback_data="address")]]
     markup = types.InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer("Как вы хотите получить ответ?", reply_markup=markup)
+
+
+# Добавление email для получения на него ответа
+@dp.callback_query(F.data == "email")
+async def getting_main_menu(callback: types.CallbackQuery):
+    await callback.message.answer("Напишите вашу электронную почту")
 
 
 # Получение ответа на дом

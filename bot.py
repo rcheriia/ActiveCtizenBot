@@ -182,6 +182,7 @@ async def add_content_app(message: types.Message):
 # Добавление email для получения на него ответа
 @dp.callback_query(F.data == "email")
 async def getting_main_menu(callback: types.CallbackQuery):
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id - 1)
     await callback.message.answer("Напишите вашу электронную почту")
 
 
@@ -192,6 +193,7 @@ async def getting_main_menu(callback: types.CallbackQuery):
     dop = reply[stat[user_id][2]]
     text = f"Номер вашего обращения {stat[user_id][1]}.\n{dop}"
     del stat[user_id]
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     await callback.message.answer(text)
 
 

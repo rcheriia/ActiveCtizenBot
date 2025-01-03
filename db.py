@@ -21,7 +21,7 @@ class Table():
         connection.commit()
         connection.close()
 
-    def user_exists(self, col, id):
+    def record_exists(self, col, id):
         with sqlite3.connect(self.db) as connection:
             cursor = connection.cursor()
             cursor.execute(f"SELECT 1 FROM {self.name} WHERE {col} = ?", (id,))
@@ -41,7 +41,7 @@ class Table():
         cursor = connection.cursor()
         ret = 0
 
-        if not self.user_exists(col[0], values[0]):
+        if not self.record_exists(col[0], values[0]):
             try:
                 cursor.execute(request, values)
                 connection.commit()
@@ -64,11 +64,11 @@ class Table():
     def update_value(self, col: list[str], values: tuple[Any, ...]):
         # Функция формирования запроса для добавления записи
         def generate_addition_request(name, columns):
-            count = ' = ?, '.join(columns[:-1]) + ' = ?'
-            return f"UPDATE {name} SET {count} WHERE {columns[-1] + ' = ?'}"
+            count = ' = ?, '.join(columns[1:]) + ' = ?'
+            return f"UPDATE {name} SET {count} WHERE {columns[0] + ' = ?'}"
 
         # Добавление записи в таблицу
-        if not self.user_exists(col[-1], values[-1]):
+        if not self.record_exists(col[0], values[0]):
             print('Записи нет в таблице.')
 
         else:
@@ -77,7 +77,7 @@ class Table():
                 connection = sqlite3.connect(self.db)
                 cursor = connection.cursor()
 
-                cursor.execute(request, values)
+                cursor.execute(request, (*values[1:], values[0]))
                 connection.commit()
                 connection.close()
 

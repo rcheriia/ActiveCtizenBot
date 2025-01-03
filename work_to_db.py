@@ -14,9 +14,10 @@ users.create_table()
 
 # Создание таблицы обращений
 col = {"appeal_id": "INTEGER PRIMARY KEY", "user_id": "INTEGER NOT NULL", "text": "TEXT",
-       "media_id": "INTEGER", "category": "TEXT NOT NULL"}
+       "media_id": "INTEGER", "category": "TEXT NOT NULL", "chapter": "TEXT"}
 appeals = Table("appeals", "ActiveBot.db", columns=col)
 appeals.create_table()
+
 
 # Добавление пользователя в таблицу user
 def add_user(user_id: int, name: str):
@@ -52,4 +53,8 @@ def add_appeal(category: str, user_id: int):
 
 # Добавление текста и фотографии, если есть
 def add_content_appeal(number: int, text: str, media_id=None):
-    appeals.update_value(["text", "media_id", "appeal_id"], (text, media_id, number))
+    appeals.update_value(["appeal_id", "text", "media_id"], (number, text, media_id))
+
+
+def add_chapter(number: int, chapter: str):
+    appeals.update_value(["appeal_id", "chapter"], (number, chapter))

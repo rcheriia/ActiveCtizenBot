@@ -4,7 +4,8 @@ from db import Table
 number_hits = {}
 
 # Создание таблицы пользователей
-col = {"user_id": "INTEGER PRIMARY KEY", "name": "TEXT", "phone_number": "TEXT", "address": "TEXT", "email": "TEXT"}
+col = {"user_id": "INTEGER PRIMARY KEY", "name": "TEXT NOT NULL", "phone_number": "TEXT", "address": "TEXT",
+       "email": "TEXT"}
 users = Table("users", "ActiveBot.db", columns=col)
 users.create_table()
 
@@ -20,10 +21,11 @@ def add_user(user_id: int, name: str):
     users.add_value(["user_id", "name"], (user_id, name))
 
 def add_phone_number(user_id: int, phone_number: str):
-    users.add_value(["user_id", "phone_number"], (user_id, phone_number))
+    users.update_value(["phone_number", "user_id"], (phone_number, user_id))
+
 # Добавляем адрес уже к существующему пользователю
 def add_address(user_id: int, address: str):
-    users.update_value(["users_id", "address"], (user_id, address))
+    users.update_value(["address", "user_id"], (address, user_id))
 
 
 # Если ответ нужно доставить по электронной почте

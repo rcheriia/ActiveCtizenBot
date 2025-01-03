@@ -15,11 +15,17 @@ class Table():
         col = ', '.join(k + ' ' + v for k, v in self.columns.items())
 
         # Создаём таблицу если отсутствует
-        connection = sqlite3.connect(self.db, timeout=10.0)
+        connection = sqlite3.connect(self.db, timeout=2)
         cursor = connection.cursor()
         cursor.execute(f"CREATE TABLE IF NOT EXISTS {self.name} ({col})")
         connection.commit()
         connection.close()
+
+    def user_exists(self, col, id):
+        with sqlite3.connect(self.db) as connection:
+            cursor = connection.cursor()
+            cursor.execute(f"SELECT 1 FROM {self.name} WHERE {col} = ?", (id,))
+            return cursor.fetchone() is not None
 
     # Добавляем запись в таблицу
     def add_value(self, col: list[str], values: tuple[Any, ...]):
@@ -31,23 +37,26 @@ class Table():
 
         # Добавление записи в таблицу
         request = generate_addition_request(self.name, col)
-        connection = sqlite3.connect(self.db, timeout=10.0)
+        connection = sqlite3.connect(self.db)
         cursor = connection.cursor()
         ret = 0
 
-        try:
-            cursor.execute(request, values)
-            connection.commit()
-            connection.close()
-            ret = 1
-        except sqlite3.IntegrityError:
-            print('Запись уже есть в таблице.')
-        except sqlite3.OperationalError:
-            print('Что-то не то')
+        if not self.user_exists(col[0], values[0]):
+            try:
+                cursor.execute(request, values)
+                connection.commit()
+                connection.close()
+                ret = 1
 
-        # Обновляем атрибуты
-        for i in col:
-            self.columns[i] = ''
+            except sqlite3.OperationalError:
+                print('База данных опять тебя броканула')
+
+        else:
+            print('Запись уже есть в таблице.')
+
+            # Обновляем атрибуты
+            for i in col:
+                self.columns[i] = ''
 
         return ret
 
@@ -59,13 +68,21 @@ class Table():
             return f"UPDATE {name} SET {count} WHERE {columns[-1] + ' = ?'}"
 
         # Добавление записи в таблицу
-        request = generate_addition_request(self.name, col)
-        connection = sqlite3.connect(self.db, timeout=10.0)
-        cursor = connection.cursor()
+        if not self.user_exists(col[-1], values[-1]):
+            print('Записи нет в таблице.')
 
-        cursor.execute(request, values)
-        connection.commit()
-        connection.close()
+        else:
+            try:
+                request = generate_addition_request(self.name, col)
+                connection = sqlite3.connect(self.db)
+                cursor = connection.cursor()
+
+                cursor.execute(request, values)
+                connection.commit()
+                connection.close()
+
+            except sqlite3.OperationalError:
+                self.update_value(col, values)
 
         # Обновляем атрибуты
         for i in col:

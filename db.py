@@ -87,3 +87,9 @@ class Table():
         # Обновляем атрибуты
         for i in col:
             self.columns[i] = ''
+
+    def get_all_rows(self):
+        with sqlite3.connect(self.db) as connection:
+            cursor = connection.cursor()
+            cursor.execute(f"SELECT * FROM {self.name}")
+            return cursor.fetchall()

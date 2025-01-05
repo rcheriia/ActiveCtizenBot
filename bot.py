@@ -6,7 +6,9 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.filters.command import Command
 from work_to_db import *
 from config import token, admin
-from location import get_addr, sl, menu, al, reply
+from location import *
+from aiogram.types.input_file import FSInputFile
+from excel import get_file
 
 # Включаем логирование, чтобы не пропустить важные сообщения
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +19,7 @@ dp = Dispatcher()
 
 stat = {}
 user_chat = set()
+
 
 # Хэндлер на команду /start
 @dp.message(Command("start"))
@@ -52,11 +55,19 @@ async def choose_treatment(message: types.Message):
     else:
         button = [[types.KeyboardButton(text="Оставить обращение")]]
         markup = types.ReplyKeyboardMarkup(keyboard=button)
-        await message.answer("Время работы онлайн сотрудника: ПН-ПТ с 10:00 до 16:00. Запрос можно оставить в рабочее время, а пока можете отправить обращение.",
-                             reply_markup=markup)
+        await message.answer(
+            "Время работы онлайн сотрудника: ПН-ПТ с 10:00 до 16:00. Запрос можно оставить в рабочее время, а пока можете отправить обращение.",
+            reply_markup=markup)
+
+# Запрос админа на выгрузку всех обращений
+@dp.message(F.text == "Выгрузить все обращения")
+async def send_appends(message: types.Message):
+    if get_file():
+        file = FSInputFile('All_appeals.xlsx')
+        await bot.send_document(message.chat.id, file)
 
 # Начало чата с представителем
-@dp.callback_query(F.data, F.func(lambda msg: msg.data not in ["approval", "not_robot", "email", "addres"]))
+@dp.callback_query(F.data, F.func(lambda msg: msg.data not in ["approval", "not_robot", "email", "address"]))
 async def start_chat(callback: types.CallbackQuery):
     button = [[types.KeyboardButton(text="Завершить чат")]]
     markup = types.ReplyKeyboardMarkup(keyboard=button)
@@ -65,6 +76,7 @@ async def start_chat(callback: types.CallbackQuery):
     stat[admin] = [user_id]
     user_chat.add(admin)
     user_chat.add(user_id)
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     await bot.send_message(user_id, "Представитель начал чат", reply_markup=markup)
     await callback.message.answer("Вы начали чат", reply_markup=markup)
 
@@ -87,6 +99,7 @@ async def end_chat(message: types.Message):
     delet(stat[user_id][0])
     delet(user_id)
 
+
 # Хэндлер для выбора варианта обращения
 @dp.message(F.text == "Оставить обращение")
 async def choose_treatment(message: types.Message):
@@ -102,7 +115,7 @@ async def choose_treatment(message: types.Message):
 @dp.message(F.text == "Жалоба")
 @dp.message(F.text == "Благодарность")
 @dp.message(F.text == "Предложение")
-async def choose_treatment(message: types.Message):
+async def send_name(message: types.Message):
     await message.answer("Напишите ваше ФИО", reply_markup=types.ReplyKeyboardRemove())
     # Присвоение статуса для отделения ФИО от текста обращения
     number = add_appeal(message.text, message.chat.id)
@@ -255,6 +268,7 @@ async def add_content_app(message: types.Message):
     elif stat[user_id][0] in user_chat:
         media, text = message.photo[-1].file_id, message.caption
         await bot.send_photo(stat[user_id][0], media, caption=text)
+
 
 # При отправке видео
 @dp.message(F.video)

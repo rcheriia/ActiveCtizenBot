@@ -13,8 +13,8 @@ users = Table("users", "ActiveBot.db", columns=col)
 users.create_table()
 
 # Создание таблицы обращений
-col = {"appeal_id": "INTEGER PRIMARY KEY", "user_id": "INTEGER NOT NULL", "text": "TEXT",
-       "media_id": "INTEGER", "category": "TEXT NOT NULL", "chapter": "TEXT"}
+col = {"appeal_id": "INTEGER PRIMARY KEY", "user_id": "INTEGER NOT NULL", "category": "TEXT NOT NULL",
+       "chapter": "TEXT", "text": "TEXT", "media_id": "INTEGER"}
 appeals = Table("appeals", "ActiveBot.db", columns=col)
 appeals.create_table()
 

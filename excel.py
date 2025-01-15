@@ -39,6 +39,7 @@ def get_file():
 
     users = Table("users", "ActiveBot.db")
     user = {x[0]: x[1:] for x in users.get_all_rows()}
+    print(user)
 
     rows = ["Номер обращения", "Категория", "Раздел", "Текст", "Фото", "ФИО", "Телефон", "Адрес", "Эл. почта"]
     for i in range(9):

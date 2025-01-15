@@ -31,22 +31,27 @@ dp = Dispatcher(storage=storage)
 stat = {}
 user_chat = set()
 
-
-# Хэндлер на команду /start
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    if message.chat.id == admin:
-        text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете сделать выгрузку всех обращений и посмотреть карту обращений.'
+def get_menu(id):
+    if id == admin:
         buttons = [[types.KeyboardButton(text="Выгрузить все обращения"),
                     types.KeyboardButton(text="Посмотреть карту обращений"),
                     types.KeyboardButton(text="Изменить статус обращения")]]
     else:
-        text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете оставить жалобу, благодарность или предложение или запрос на онлайн общение с представителем администрации'
         buttons = [[types.KeyboardButton(text="Запрос на общение с представителем администрации"),
                     types.KeyboardButton(text="Оставить обращение"),
                     types.KeyboardButton(text="Посмотреть карту обращений")]]
 
     markup = types.ReplyKeyboardMarkup(keyboard=buttons)
+    return markup
+
+# Хэндлер на команду /start
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    if message.chat.id == admin:
+        text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете оставить жалобу, благодарность, предложение или запрос на онлайн общение с представителем администрации'
+    else:
+        text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете сделать выгрузку всех обращений и посмотреть карту обращений.'
+    markup = get_menu(message.chat.id)
     await message.answer(text)
     await message.answer("Что хотите сделать?", reply_markup=markup)
 
@@ -55,8 +60,9 @@ async def start(message: types.Message):
 @dp.message(F.text == "Выгрузить все обращения")
 async def send_appends(message: types.Message):
     if get_file():
+        markup = get_menu(message.chat.id)
         file = FSInputFile('All_appeals.xlsx')
-        await bot.send_document(message.chat.id, file)
+        await bot.send_document(message.chat.id, file, reply_markup=markup)
 
 
 @dp.message(F.text == "Изменить статус обращения")
@@ -107,7 +113,7 @@ async def choose_treatment(message: types.Message):
 async def start_chat(callback: types.CallbackQuery):
     button = [[types.KeyboardButton(text="Завершить чат")]]
     markup = types.ReplyKeyboardMarkup(keyboard=button)
-    user_id = callback.data
+    user_id = int(callback.data)
     stat[user_id] = [admin]
     stat[admin] = [user_id]
     user_chat.add(admin)
@@ -121,8 +127,8 @@ async def start_chat(callback: types.CallbackQuery):
 @dp.message(F.text == "Завершить чат")
 async def end_chat(message: types.Message):
     user_id = message.chat.id
-    await bot.send_message(stat[user_id][0], "Чат завершён", reply_markup=types.ReplyKeyboardRemove())
-    await message.answer("Чат завершён", reply_markup=types.ReplyKeyboardRemove())
+    await bot.send_message(stat[user_id][0], "Чат завершён", reply_markup=get_menu(user_id))
+    await message.answer("Чат завершён", reply_markup=get_menu(stat[user_id][0]))
     user_chat.discard(user_id)
     user_chat.discard(stat[user_id][0])
 
@@ -136,11 +142,11 @@ async def end_chat(message: types.Message):
     delet(user_id)
 
 
-# Посмотреть карту обращений. Админу выдаётся ссылка на редактирование
+# Посмотреть карту обращений
 @dp.message(F.text == "Посмотреть карту обращений")
-async def look_reqeust(message: types.Message):
+async def look_kart(message: types.Message):
     user_id = message.chat.id
-    text = "На карте отражена актуальная информация. Если вашего обращения ещё нет, значит оно на рассмотрении."
+    text = "Предлагаем вам посмотреть карту обращений. На ней отражена актуальная информация. Если вашего обращения ещё нет, значит оно на рассмотрении."
     link = "https://yandex.ru/maps/?um=constructor%3A5b85c707df5feba269aa8f20aa4773b24af0ea9d09d80d2c14e9e025e0eeafd0&source=constructorLink"
     if user_id == admin:
         text = "Помимо просмотра, вы также можете редактировать карту. За данными для входа, обратитесь к администратору."
@@ -213,8 +219,9 @@ async def getting_text(message: types.Message):
         text = f"Номер вашего обращения {stat[user_id][1]}.\n{dop}"
         del stat[user_id]
         await message.answer(text)
+        await look_kart(message)
 
-    elif stat[user_id][0] in user_chat:
+    elif user_id in user_chat:
         await bot.send_message(stat[user_id][0], message.text)
 
 
@@ -314,7 +321,7 @@ async def add_content_app(message: types.Message):
         await message.answer("Как вы хотите получить ответ?", reply_markup=markup)
 
     # Подразумевается чат с представителем
-    elif stat[user_id][0] in user_chat:
+    elif user_id in user_chat:
         media, text = message.photo[-1].file_id, message.caption
         await bot.send_photo(stat[user_id][0], media, caption=text)
 
@@ -323,18 +330,22 @@ async def add_content_app(message: types.Message):
 @dp.message(F.video)
 async def add_content_app(message: types.Message):
     # Подразумевается чат с представителем
-    if stat[message.chat.id][0] in user_chat:
+    if message.chat.id in user_chat:
         media, text = message.video.file_id, message.caption
         await bot.send_document(stat[message.chat.id][0], media, caption=text)
+    else:
+        await start(message)
 
 
 # При отправке документа
 @dp.message(F.document)
 async def send_document(message: types.Message):
     # Подразумевается чат с представителем
-    if stat[message.chat.id][0] in user_chat:
+    if message.chat.id in user_chat:
         media, text = message.document.file_id, message.caption
         await bot.send_document(stat[message.chat.id][0], media, caption=text)
+    else:
+        await start(message)
 
 
 # Добавление email для получения на него ответа
@@ -347,12 +358,18 @@ async def getting_main_menu(callback: types.CallbackQuery):
 # Получение ответа на дом
 @dp.callback_query(F.data == "address")
 async def getting_main_menu(callback: types.CallbackQuery):
+    markup = get_menu(callback.message.chat.id)
     user_id = callback.message.chat.id
     dop = reply[stat[user_id][2]]
     text = f"Номер вашего обращения {stat[user_id][1]}.\n{dop}"
     del stat[user_id]
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    await callback.message.answer(text)
+    await callback.message.answer(text, reply_markup=markup)
+    text = "Предлагаем вам посмотреть карту обращений. На ней отражена актуальная информация. Если вашего обращения ещё нет, значит оно на рассмотрении."
+    link = "https://yandex.ru/maps/?um=constructor%3A5b85c707df5feba269aa8f20aa4773b24af0ea9d09d80d2c14e9e025e0eeafd0&source=constructorLink"
+    buttons = [[types.InlineKeyboardButton(text="Посмотреть карту", url=link)]]
+    markup = types.InlineKeyboardMarkup(inline_keyboard=buttons)
+    await callback.message.answer(text, reply_markup=markup)
 
 
 # Запуск процесса поллинга новых апдейтов

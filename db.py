@@ -24,8 +24,8 @@ class Table():
     def record_exists(self, col, id):
         with sqlite3.connect(self.db) as connection:
             cursor = connection.cursor()
-            cursor.execute(f"SELECT 1 FROM {self.name} WHERE {col} = ?", (id,))
-            return cursor.fetchone() is not None
+            cursor.execute(f"SELECT * FROM {self.name} WHERE {col} = ?", (id,))
+            return cursor.fetchone()
 
     # Добавляем запись в таблицу
     def add_value(self, col: list[str], values: tuple[Any, ...]):
@@ -41,7 +41,7 @@ class Table():
         cursor = connection.cursor()
         ret = 0
 
-        if not self.record_exists(col[0], values[0]):
+        if self.record_exists(col[0], values[0]) is None:
             try:
                 cursor.execute(request, values)
                 connection.commit()
@@ -68,7 +68,7 @@ class Table():
             return f"UPDATE {name} SET {count} WHERE {columns[0] + ' = ?'}"
 
         # Добавление записи в таблицу
-        if not self.record_exists(col[0], values[0]):
+        if self.record_exists(col[0], values[0]) is None:
             print('Записи нет в таблице.')
 
         else:

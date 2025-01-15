@@ -58,3 +58,7 @@ def add_content_appeal(number: int, text: str, media_id=None):
 
 def add_chapter(number: int, chapter: str):
     appeals.update_value(["appeal_id", "chapter"], (number, chapter))
+
+
+def check_request(number: int):
+    return appeals.record_exists(["appeal_id"], (number,))

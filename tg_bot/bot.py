@@ -9,13 +9,24 @@ from config import token, admin
 from location import *
 from aiogram.types.input_file import FSInputFile
 from excel import get_file
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.filters.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+
+
+class AppForm(StatesGroup):
+    count = State()
+
+
+class StatForm(StatesGroup):
+    count = State()
+
 
 # Включаем логирование, чтобы не пропустить важные сообщения
+storage = MemoryStorage()
 logging.basicConfig(level=logging.INFO)
-# Объект бота
 bot = Bot(token=token)
-# Диспетчер
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
 
 stat = {}
 user_chat = set()
@@ -27,7 +38,8 @@ async def start(message: types.Message):
     if message.chat.id == admin:
         text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете сделать выгрузку всех обращений и посмотреть карту обращений.'
         buttons = [[types.KeyboardButton(text="Выгрузить все обращения"),
-                    types.KeyboardButton(text="Посмотреть карту обращений")]]
+                    types.KeyboardButton(text="Посмотреть карту обращений"),
+                    types.KeyboardButton(text="Изменить статус обращения")]]
     else:
         text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете оставить жалобу, благодарность или предложение или запрос на онлайн общение с представителем администрации'
         buttons = [[types.KeyboardButton(text="Запрос на общение с представителем администрации"),
@@ -37,6 +49,37 @@ async def start(message: types.Message):
     markup = types.ReplyKeyboardMarkup(keyboard=buttons)
     await message.answer(text)
     await message.answer("Что хотите сделать?", reply_markup=markup)
+
+
+# Запрос админа на выгрузку всех обращений
+@dp.message(F.text == "Выгрузить все обращения")
+async def send_appends(message: types.Message):
+    if get_file():
+        file = FSInputFile('All_appeals.xlsx')
+        await bot.send_document(message.chat.id, file)
+
+
+@dp.message(F.text == "Изменить статус обращения")
+async def change_status(message: types.Message, state: FSMContext):
+    await message.answer("Напишите номер обращения")
+    await state.set_state(AppForm.count)
+
+
+@dp.message(AppForm.count)
+async def get_number_appeal(message: types.Message, state: FSMContext):
+    await state.clear()
+    check = check_request(int(message.text))
+    if check is not None:
+        await message.answer("На что изменить статус?")
+        await state.set_state(StatForm.count)
+    else:
+        await message.answer("Обращения с таким номером не существует")
+
+
+@dp.message(StatForm.count)
+async def get_new_stat(message: types.Message):
+    app = check_request(int(message.text))
+    print(app)
 
 
 # Хэндлер на запрос общения с администрацией
@@ -57,14 +100,6 @@ async def choose_treatment(message: types.Message):
         await message.answer(
             "Время работы онлайн сотрудника: ПН-ПТ с 10:00 до 16:00. Запрос можно оставить в рабочее время, а пока можете отправить обращение.",
             reply_markup=markup)
-
-
-# Запрос админа на выгрузку всех обращений
-@dp.message(F.text == "Выгрузить все обращения")
-async def send_appends(message: types.Message):
-    if get_file():
-        file = FSInputFile('All_appeals.xlsx')
-        await bot.send_document(message.chat.id, file)
 
 
 # Начало чата с представителем
@@ -105,12 +140,12 @@ async def end_chat(message: types.Message):
 @dp.message(F.text == "Посмотреть карту обращений")
 async def look_reqeust(message: types.Message):
     user_id = message.chat.id
-    link = "https://bit.ly/426vXxh"
+    text = "На карте отражена актуальная информация. Если вашего обращения ещё нет, значит оно на рассмотрении."
+    link = "https://yandex.ru/maps/?um=constructor%3A5b85c707df5feba269aa8f20aa4773b24af0ea9d09d80d2c14e9e025e0eeafd0&source=constructorLink"
     if user_id == admin:
-        link = "https://bit.ly/4gZ8RwK"
+        text = "Помимо просмотра, вы также можете редактировать карту. За данными для входа, обратитесь к администратору."
     buttons = [[types.InlineKeyboardButton(text="Посмотреть карту", url=link)]]
     markup = types.InlineKeyboardMarkup(inline_keyboard=buttons)
-    text = "На карте отражена актуальная информация. Если вашего обращения ещё нет, значит оно на рассмотрении."
     await message.answer(text, reply_markup=markup)
 
 

@@ -62,3 +62,4 @@ def add_chapter(number: int, chapter: str):
 
 def check_request(number: int):
     return appeals.record_exists("appeal_id", number)
+

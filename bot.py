@@ -31,6 +31,7 @@ dp = Dispatcher(storage=storage)
 stat = {}
 user_chat = set()
 
+
 def get_menu(id):
     if id == admin:
         buttons = [[types.KeyboardButton(text="Выгрузить все обращения"),
@@ -43,6 +44,7 @@ def get_menu(id):
 
     markup = types.ReplyKeyboardMarkup(keyboard=buttons)
     return markup
+
 
 # Хэндлер на команду /start
 @dp.message(Command("start"))

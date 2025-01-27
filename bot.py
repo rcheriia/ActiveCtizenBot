@@ -45,6 +45,12 @@ def get_menu(id):
     markup = types.ReplyKeyboardMarkup(keyboard=buttons)
     return markup
 
+def get_status(status):
+    markup = ReplyKeyboardBuilder()
+    for i in status:
+        markup.add(types.KeyboardButton(text=i))
+    markup.adjust(2)
+    return markup
 
 # Хэндлер на команду /start
 @dp.message(Command("start"))
@@ -78,16 +84,23 @@ async def get_number_appeal(message: types.Message, state: FSMContext):
     await state.clear()
     check = check_request(int(message.text))
     if check is not None:
-        await message.answer("На что изменить статус?")
-        await state.set_state(StatForm.count)
+        if check[2] in types_appeals:
+            markup = get_status(types_appeals[check[2]])
+            await message.answer("На что изменить статус?", reply_markup=markup.as_markup(resize_keyboard=True))
+            stat[message.chat.id] = [int(message.text)]
+            await state.set_state(StatForm.count)
+        else:
+            await message.answer("У благодарностей нет статуса")
+            await change_status(message, state)
     else:
         await message.answer("Обращения с таким номером не существует")
 
 
 @dp.message(StatForm.count)
 async def get_new_stat(message: types.Message):
-    app = check_request(int(message.text))
-    print(app)
+    check = check_request(stat[message.chat.id][0])
+    await bot.send_message(check[1], f'Ваше обращение {check[0]} изменило статус на "{message.text}"')
+    await message.answer("Статус изменён", reply_markup=get_menu(message.chat.id))
 
 
 # Хэндлер на запрос общения с администрацией
@@ -100,7 +113,10 @@ async def choose_treatment(message: types.Message):
         markup = types.InlineKeyboardMarkup(inline_keyboard=button)
         await message.answer("Когда представитель будет свободен, мы дадим вам знать",
                              reply_markup=types.ReplyKeyboardRemove())
-        await bot.send_message(admin, "Пришёл запрос на общение с администрацией.", reply_markup=markup)
+        stat[message.chat.id] = [admin]
+        stat[admin] = [message.chat.id]
+        if admin not in user_chat:
+            await bot.send_message(admin, "Пришёл запрос на общение с администрацией.", reply_markup=markup)
 
     else:
         button = [[types.KeyboardButton(text="Оставить обращение")]]
@@ -115,13 +131,10 @@ async def choose_treatment(message: types.Message):
 async def start_chat(callback: types.CallbackQuery):
     button = [[types.KeyboardButton(text="Завершить чат")]]
     markup = types.ReplyKeyboardMarkup(keyboard=button)
-    user_id = int(callback.data)
-    stat[user_id] = [admin]
-    stat[admin] = [user_id]
     user_chat.add(admin)
-    user_chat.add(user_id)
+    user_chat.add(int(callback.data))
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    await bot.send_message(user_id, "Представитель начал чат", reply_markup=markup)
+    await bot.send_message(int(callback.data), "Представитель начал чат", reply_markup=markup)
     await callback.message.answer("Вы начали чат", reply_markup=markup)
 
 
@@ -129,19 +142,29 @@ async def start_chat(callback: types.CallbackQuery):
 @dp.message(F.text == "Завершить чат")
 async def end_chat(message: types.Message):
     user_id = message.chat.id
-    await bot.send_message(stat[user_id][0], "Чат завершён", reply_markup=get_menu(user_id))
-    await message.answer("Чат завершён", reply_markup=get_menu(stat[user_id][0]))
+    await bot.send_message(admin, "Чат завершён", reply_markup=admin)
+    await message.answer("Чат завершён", reply_markup=get_menu(user_id))
     user_chat.discard(user_id)
     user_chat.discard(stat[user_id][0])
 
     def delet(user):
-        if len(stat[user]) == 1:
-            del stat[user]
-        else:
+        if user == admin:
             del stat[user][0]
+            if stat[user] >= 1:
+                button = [[types.InlineKeyboardButton(text="Начать чат", callback_data=str(stat[user_id][0]))]]
+                markup = types.InlineKeyboardMarkup(inline_keyboard=button)
+                return True, markup
+        else:
+            del stat[user]
+            return False, ''
 
-    delet(stat[user_id][0])
-    delet(user_id)
+    bol, markup = delet(stat[user_id][0])
+    if bol:
+        await bot.send_message(admin, "Пришёл запрос на общение с администрацией.", reply_markup=markup)
+
+    bol, markup = delet(user_id)
+    if bol:
+        await bot.send_message(user_id, "Пришёл запрос на общение с администрацией.", reply_markup=markup)
 
 
 # Посмотреть карту обращений

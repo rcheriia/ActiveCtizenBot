@@ -12,6 +12,20 @@ from excel import get_file
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.filters.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramNetworkError
+
+
+class SendAppeal(StatesGroup):
+    number_app = State()
+    type = State()
+    name = State()
+    phone_number = State()
+    address = State()
+    appeal = State()
+
+
+class ChangeStatus(StatesGroup):
+    number_app = State()
 
 
 class AppForm(StatesGroup):
@@ -32,8 +46,8 @@ stat = {}
 user_chat = set()
 
 
-def get_menu(id):
-    if id == admin:
+def get_menu(user_id):
+    if user_id == admin:
         buttons = [[types.KeyboardButton(text="Выгрузить все обращения"),
                     types.KeyboardButton(text="Посмотреть карту обращений"),
                     types.KeyboardButton(text="Изменить статус обращения")]]
@@ -45,23 +59,26 @@ def get_menu(id):
     markup = types.ReplyKeyboardMarkup(keyboard=buttons)
     return markup
 
-def get_status(status):
-    markup = ReplyKeyboardBuilder()
-    for i in status:
-        markup.add(types.KeyboardButton(text=i))
-    markup.adjust(2)
-    return markup
 
 # Хэндлер на команду /start
+# Получение согласия на обработку данных и капча
 @dp.message(Command("start"))
-async def start(message: types.Message):
-    if message.chat.id == admin:
+async def check_robot(message: types.Message):
+    button = [[types.InlineKeyboardButton(text="Я робот", callback_data="robot"),
+               types.InlineKeyboardButton(text="Я не робот", callback_data="not_robot")]]
+    markup = types.InlineKeyboardMarkup(inline_keyboard=button)
+    await bot.send_message(message.chat.id, "Подтвердите, что вы не робот", reply_markup=markup)
+
+
+@dp.callback_query(F.data == "not_robot")
+async def start(callback: types.CallbackQuery):
+    if callback.message.chat.id == admin:
         text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете оставить жалобу, благодарность, предложение или запрос на онлайн общение с представителем администрации'
     else:
         text = 'Здравствуйте. Это бот "Активный гражданин". Здесь вы можете сделать выгрузку всех обращений и посмотреть карту обращений.'
-    markup = get_menu(message.chat.id)
-    await message.answer(text)
-    await message.answer("Что хотите сделать?", reply_markup=markup)
+    markup = get_menu(callback.message.chat.id)
+    await callback.message.answer(text)
+    await callback.message.answer("Что хотите сделать?", reply_markup=markup)
 
 
 # Запрос админа на выгрузку всех обращений
@@ -75,6 +92,14 @@ async def send_appends(message: types.Message):
 
 @dp.message(F.text == "Изменить статус обращения")
 async def change_status(message: types.Message, state: FSMContext):
+    markup = ReplyKeyboardBuilder()
+    lst = all_is_st()
+    if lst:
+        for i in all_is_st():
+            markup.add(types.KeyboardButton(text=str(i[0])))
+        markup.adjust(2)
+        markup = markup.as_markup(resize_keyboard=True)
+        await message.answer("Напишите номер обращения или выберете номер обращения", reply_markup=markup)
     await message.answer("Напишите номер обращения")
     await state.set_state(AppForm.count)
 
@@ -85,22 +110,29 @@ async def get_number_appeal(message: types.Message, state: FSMContext):
     check = check_request(int(message.text))
     if check is not None:
         if check[2] in types_appeals:
-            markup = get_status(types_appeals[check[2]])
-            await message.answer("На что изменить статус?", reply_markup=markup.as_markup(resize_keyboard=True))
+            markup = ReplyKeyboardBuilder()
+            for i in types_appeals[check[2]]:
+                markup.add(types.KeyboardButton(text=i))
+            markup.adjust(2)
+            markup = markup.as_markup(resize_keyboard=True)
+            await message.answer(f"Обращение {message.text} имеет статус {check[-1]}")
+            try:
+                await message.answer("На что изменить статус?", reply_markup=markup)
+            except TelegramNetworkError:
+                await message.answer("На что изменить статус?", reply_markup=markup)
             stat[message.chat.id] = [int(message.text)]
             await state.set_state(StatForm.count)
         else:
             await message.answer("У благодарностей нет статуса")
-            await change_status(message, state)
     else:
         await message.answer("Обращения с таким номером не существует")
 
 
 @dp.message(StatForm.count)
-async def get_new_stat(message: types.Message):
-    check = check_request(stat[message.chat.id][0])
-    await bot.send_message(check[1], f'Ваше обращение {check[0]} изменило статус на "{message.text}"')
-    await message.answer("Статус изменён", reply_markup=get_menu(message.chat.id))
+async def get_new_stat(message: types.Message, state: FSMContext):
+    change_stat(stat[message.chat.id][0], message.text)
+    await bot.send_message(message.chat.id, f'Ваше обращение {stat[message.chat.id][0]} изменило статус на "{message.text}"')
+    await bot.send_message(check_request(stat[message.chat.id][0])[1], "Статус изменён", reply_markup=get_menu(message.chat.id))
 
 
 # Хэндлер на запрос общения с администрацией
@@ -152,8 +184,8 @@ async def end_chat(message: types.Message):
             del stat[user][0]
             if stat[user] >= 1:
                 button = [[types.InlineKeyboardButton(text="Начать чат", callback_data=str(stat[user_id][0]))]]
-                markup = types.InlineKeyboardMarkup(inline_keyboard=button)
-                return True, markup
+                mark = types.InlineKeyboardMarkup(inline_keyboard=button)
+                return True, mark
         else:
             del stat[user]
             return False, ''
@@ -172,7 +204,7 @@ async def end_chat(message: types.Message):
 async def look_kart(message: types.Message):
     user_id = message.chat.id
     text = "Предлагаем вам посмотреть карту обращений. На ней отражена актуальная информация. Если вашего обращения ещё нет, значит оно на рассмотрении."
-    link = "https://yandex.ru/maps/?um=constructor%3A5b85c707df5feba269aa8f20aa4773b24af0ea9d09d80d2c14e9e025e0eeafd0&source=constructorLink"
+    link = "https://gromyul9.nextgis.com/resource/4/display?panel=layers"
     if user_id == admin:
         text = "Помимо просмотра, вы также можете редактировать карту. За данными для входа, обратитесь к администратору."
     buttons = [[types.InlineKeyboardButton(text="Посмотреть карту", url=link)]]
@@ -218,10 +250,10 @@ async def getting_text(message: types.Message):
         add_phone_number(user_id, message.text)
         button = [[types.KeyboardButton(text="Отправить геолокацию", request_location=True)]]
         markup = types.ReplyKeyboardMarkup(keyboard=button)
-        await message.answer("Напишите ваш адрес", reply_markup=markup)
+        await message.answer("Напишите ваш адрес или отправьте геолокацию. Формат написания: населённый пункт, улица, дом. Пример: город Россошь, улица Пролетарская, дом 150Б", reply_markup=markup)
 
     elif stat[user_id][0] == "loc":
-        add_address(user_id, message.text)
+        add_address(stat[user_id][1], user_id, message.text, *get_coords(message.text))
         button = [[types.InlineKeyboardButton(text="Даю согласие", callback_data="approval")]]
         markup = types.InlineKeyboardMarkup(inline_keyboard=button)
         await message.answer(
@@ -232,7 +264,6 @@ async def getting_text(message: types.Message):
         stat[user_id][0] = "email"
         add_content_appeal(stat[user_id][1], message.text)
 
-        add_address(user_id, message.text)
         buttons = [[types.InlineKeyboardButton(text="По электронной почте", callback_data="email"),
                     types.InlineKeyboardButton(text="По адресу заявителя", callback_data="address")]]
         markup = types.InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -243,11 +274,12 @@ async def getting_text(message: types.Message):
         dop = reply[stat[user_id][2]]
         text = f"Номер вашего обращения {stat[user_id][1]}.\n{dop}"
         del stat[user_id]
-        await message.answer(text)
+        await message.answer(text, reply_markup=get_menu(message.chat.id))
         await look_kart(message)
 
     elif user_id in user_chat:
         await bot.send_message(stat[user_id][0], message.text)
+
 
 
 # Хэндлер на местоположение пользователя
@@ -260,7 +292,7 @@ async def location_handler(message: types.Message):
     lat = message.location.latitude
     long = message.location.longitude
     user_id = message.chat.id
-    add_address(user_id, get_addr([lat, long]))
+    add_address(stat[user_id][1], user_id, get_addr([lat, long]), lat, long)
 
     # Получение у пользователя согласия на обработку персональных данных
     button = [[types.InlineKeyboardButton(text="Даю согласие", callback_data="approval")]]
@@ -269,19 +301,8 @@ async def location_handler(message: types.Message):
         "Для того, чтобы мы могли с Вами связаться, по правилам РФ, нам нужно спросить Ваше согласие на обработку персональных данных и с правилами сайте",
         reply_markup=markup)
 
-
-# Получение согласия на обработку данных и капча
-@dp.callback_query(F.data == "approval")
-async def check_robot(callback: types.CallbackQuery):
-    button = [[types.InlineKeyboardButton(text="Я робот", callback_data="robot"),
-               types.InlineKeyboardButton(text="Я не робот", callback_data="not_robot")]]
-    markup = types.InlineKeyboardMarkup(inline_keyboard=button)
-    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    await callback.message.answer("Подтвердите, что вы не робот", reply_markup=markup)
-
-
 # После прохождения капчи выбор раздела обращения
-@dp.callback_query(F.data == "not_robot")
+@dp.callback_query(F.data == "approval")
 async def getting_main_menu(callback: types.CallbackQuery):
     markup = ReplyKeyboardBuilder()
     for i in menu:

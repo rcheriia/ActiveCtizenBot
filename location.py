@@ -1,10 +1,11 @@
 from geopy.exc import GeocoderUnavailable
 from geopy.geocoders import Nominatim
+from geopy.geocoders import ArcGIS
 
 
 def get_addr(location: list) -> str:
     try:
-        geo_loc = Nominatim(user_agent="GetLoc")
+        geo_loc = Nominatim(user_agent="rcheriia_002")
         loc_name = geo_loc.reverse(location)
         loc = reversed(loc_name.address.split(', ')[:3])
         rev_loc = ', '.join(loc)
@@ -12,6 +13,11 @@ def get_addr(location: list) -> str:
     except GeocoderUnavailable:
         return 'Unknown'
 
+
+def get_coords(address: str) -> str:
+    geolocator_arcgis = ArcGIS()
+    location = geolocator_arcgis.geocode(address)
+    return location.latitude, location.longitude
 
 menu = ["ЖКХ", "Транспорт", "Спорт", "Правопорядок", "Культура",
         "Здравоохранение", "Бытовое обслуживание", "Образование"]
